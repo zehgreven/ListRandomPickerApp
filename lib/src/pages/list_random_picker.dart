@@ -15,16 +15,22 @@ class ListRandomPickerApp extends StatefulWidget {
 class _State extends State<ListRandomPickerApp> {
   final List<Item> items = defaultItems;
 
-  TextEditingController nameController = TextEditingController();
+  TextEditingController itemValueController = TextEditingController();
 
-  void addItemToList() {
+  void addItem(String value) {
     setState(() {
-      items.add(Item(nameController.text, false));
-      nameController.clear();
+      items.add(Item(value, false));
+      itemValueController.clear();
     });
   }
 
-  void clearList() {
+  void removeItemByIndex(int index) {
+    setState(() {
+      items.removeAt(index);
+    });
+  }
+
+  void clearItems() {
     setState(() {
       items.clear();
     });
@@ -34,8 +40,8 @@ class _State extends State<ListRandomPickerApp> {
     return items[value].picked;
   }
 
-  bool isThereItemToBePicked() {
-    return items.indexWhere((name) => !name.picked) != -1;
+  bool existItemsToBePicked() {
+    return items.any((item) => !item.picked);
   }
 
   int pickNextRandomValidInt() {
@@ -47,7 +53,7 @@ class _State extends State<ListRandomPickerApp> {
   }
 
   int pickRandomValue() {
-    if (isThereItemToBePicked()) {
+    if (existItemsToBePicked()) {
       return pickNextRandomValidInt();
     }
 
@@ -64,12 +70,16 @@ class _State extends State<ListRandomPickerApp> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
-  void resetPickedList() {
+  void resetPickedItems() {
     for (var item in items) {
       setState(() {
         item.picked = false;
       });
     }
+  }
+
+  bool isValueDuplicated(String value) {
+    return items.any((item) => item.value == value);
   }
 
   Future<bool> showDialogMessage(
@@ -125,7 +135,7 @@ class _State extends State<ListRandomPickerApp> {
                       'Do you want to restore all the items to a "not picked" state?',
                       showCancel: true);
                   if (result) {
-                    resetPickedList();
+                    resetPickedItems();
                     showSnackBarMessage(
                         'All the items have been restored to a "not picked" state.');
                   }
@@ -161,7 +171,7 @@ class _State extends State<ListRandomPickerApp> {
               child: Column(
                 children: [
                   TextField(
-                    controller: nameController,
+                    controller: itemValueController,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       labelText: 'New Item',
@@ -176,7 +186,7 @@ class _State extends State<ListRandomPickerApp> {
                           child: ElevatedButton(
                             child: const Text('Clear List'),
                             onPressed: () {
-                              clearList();
+                              clearItems();
                             },
                           ),
                         ),
@@ -188,7 +198,20 @@ class _State extends State<ListRandomPickerApp> {
                           child: ElevatedButton(
                             child: const Text('Add'),
                             onPressed: () {
-                              addItemToList();
+                              String value = itemValueController.text;
+                              if (value.isEmpty) {
+                                showDialogMessage(context,
+                                    'Please, provide a valid value to be added.');
+                                return;
+                              }
+
+                              if (isValueDuplicated(value)) {
+                                showDialogMessage(context,
+                                    'The value is already in the list, please provide a not duplicated one.');
+                                return;
+                              }
+
+                              addItem(value);
                             },
                           ),
                         ),
@@ -199,15 +222,25 @@ class _State extends State<ListRandomPickerApp> {
               child: ListView.builder(
                   padding: const EdgeInsets.all(8),
                   itemCount: items.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return Container(
-                      height: 50,
+                  itemBuilder: (context, index) {
+                    return Card(
                       margin: const EdgeInsets.all(2),
                       color:
                           isItemPicked(index) ? Colors.grey : Colors.blue[100],
-                      child: Center(
-                          child: Text(items[index].value,
-                              style: const TextStyle(fontSize: 18))),
+                      child: ListTile(
+                        title: Text(items[index].value,
+                            style: const TextStyle(fontSize: 18)),
+                        onLongPress: () async {
+                          bool result = await showDialogMessage(context,
+                              'Do you want to remove the value "${items[index].value}" from the list?',
+                              showCancel: true,
+                              cancel: 'No',
+                              ok: 'Yes, remove');
+                          if (result) {
+                            removeItemByIndex(index);
+                          }
+                        },
+                      ),
                     );
                   }))
         ]));
